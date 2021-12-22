@@ -1,4 +1,4 @@
-module github.com/blues/hub/tools/vagrantLogs
+module github.com/stefanvanburen/nomadlogs
 
 go 1.17
 
