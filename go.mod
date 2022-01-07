@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/hashicorp/nomad/api v0.0.0-20211220150801-0ec5db432fe4
 	github.com/oklog/run v1.1.0
-	github.com/peterbourgon/ff/v3 v3.1.0
+	github.com/peterbourgon/ff/v3 v3.1.2
 )
 
 require (
