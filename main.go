@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-	log.SetPrefix("nomadlogs")
+	log.SetPrefix("nomadlogs ")
 	if err := run(os.Args[1:]); err != nil {
 		log.Fatal(err)
 	}
