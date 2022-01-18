@@ -33,6 +33,7 @@ func run(args []string) error {
 		// ...
 		// TODO: better usage
 		jobs = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
+		addr = watchFlagSet.String("addr", "http://127.0.0.1:4646", "nomad address")
 	)
 
 	if err := ff.Parse(watchFlagSet, args, ff.WithEnvVarPrefix("NOMAD_LOGS")); err != nil {
@@ -44,14 +45,14 @@ func run(args []string) error {
 		ShortUsage: "nomadlogs watch [<arg> ...]",
 		ShortHelp:  "watch the number of bytes in the arguments.",
 		FlagSet:    watchFlagSet,
-		Exec: func(_ context.Context, args []string) error {
+		Exec: func(ctx context.Context, args []string) error {
+			cfg := nomad.DefaultConfig()
+			cfg.Address = *addr
 
-			client, err := nomad.NewClient(nomad.DefaultConfig())
+			client, err := nomad.NewClient(cfg)
 			if err != nil {
 				return fmt.Errorf("could not create nomad client: %s", err)
 			}
-
-			ctx := context.Background()
 
 			var g okrun.Group
 			for _, jobToTask := range strings.Split(*jobs, ",") {
