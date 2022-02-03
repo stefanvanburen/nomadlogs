@@ -16,6 +16,9 @@ import (
 )
 
 func main() {
+	// write meta logs to stderr, actual program output to stdout
+	log.SetOutput(os.Stderr)
+
 	log.SetPrefix("nomadlogs ")
 	if err := run(os.Args[1:]); err != nil {
 		log.Fatal(err)
@@ -25,13 +28,6 @@ func main() {
 func run(args []string) error {
 	watchFlagSet := flag.NewFlagSet("nomadlogs", flag.ExitOnError)
 	var (
-		// noteadmin,notesim-api
-		// job                  -> task
-		// public_notediscovery -> notediscovery
-		// noteboard            -> noteboard
-		// public_notehandler   -> public_notehandler
-		// ...
-		// TODO: better usage
 		jobs = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
 		addr = watchFlagSet.String("addr", "http://127.0.0.1:4646", "nomad address")
 	)
