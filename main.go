@@ -99,7 +99,7 @@ type jobWatcher struct {
 	client *nomad.Client
 }
 
-const waitDuration = 30 * time.Second
+const waitDuration = 5 * time.Second
 
 func (jw *jobWatcher) run(ctx context.Context) error {
 	log.Printf("watching job %s, task %s\n", jw.job, jw.task)
