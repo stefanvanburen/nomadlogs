@@ -41,7 +41,7 @@ func run(args []string) error {
 		ShortUsage: "nomadlogs watch [<arg> ...]",
 		ShortHelp:  "watch the number of bytes in the arguments.",
 		FlagSet:    watchFlagSet,
-		Exec: func(ctx context.Context, args []string) error {
+		Exec: func(ctx context.Context, _ []string) error {
 			cfg := nomad.DefaultConfig()
 			cfg.Address = *addr
 
