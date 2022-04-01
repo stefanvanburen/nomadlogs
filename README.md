@@ -18,14 +18,8 @@ nomadlogs watch -jobs job1:task1,job2:task1,job2:task2
 
 By default, nomadlogs will use the Nomad SDK's default configuration for Nomad at `http://127.0.0.1:4646`.
 
-A more realistic example for our local-dev:
-
-```sh
-nomadlogs watch -jobs noteboard:noteboard,public_notehandler:public_notehandler,public_notediscovery:notediscovery
-```
-
 Also, if you're forwarding another instance of Nomad to another port, say `:4647`, you can run:
 
 ```sh
-nomadlogs watch -jobs noteboard:noteboard,public_notehandler:public_notehandler,public_notediscovery:notediscovery -addr "http://localhost:4647"
+nomadlogs watch -jobs job1:task1,job2:task1,job2:task2 -addr "http://localhost:4647"
 ```
