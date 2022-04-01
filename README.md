@@ -1,6 +1,6 @@
 # nomadlogs
 
-CLI for combining logs from multiple nomad jobs / tasks / allocations into a single stream.
+CLI for combining logs from multiple [Nomad](https://github.com/hashicorp/nomad) jobs / tasks / allocations into a single stream.
 
 ## Installation
 
