@@ -142,7 +142,16 @@ func (jw *jobWatcher) watchStream(ctx context.Context, allocation *nomad.Allocat
 
 	for {
 		select {
-		case stdoutFrame := <-stdoutFrames:
+		case stdoutFrame, more := <-stdoutFrames:
+			if !more {
+				log.Printf("stdoutFrames closed!")
+				return nil
+			}
+			if stdoutFrame == nil {
+				log.Printf("got nil stdout frame, skipping")
+				continue
+			}
+
 			// We're probably getting multiple lines.
 			raw := string(stdoutFrame.Data)
 			ss := strings.Split(raw, "\n")
@@ -152,10 +161,19 @@ func (jw *jobWatcher) watchStream(ctx context.Context, allocation *nomad.Allocat
 					continue
 				}
 
-				fmt.Printf("%s: %s\n", jw.job, s)
+				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], s)
 			}
 
-		case stderrFrame := <-stderrFrames:
+		case stderrFrame, more := <-stderrFrames:
+			if !more {
+				log.Printf("stderrFrames closed!")
+				return nil
+			}
+			if stderrFrame == nil {
+				log.Printf("got nil stderr frame")
+				continue
+			}
+
 			// We're probably getting multiple lines.
 			raw := string(stderrFrame.Data)
 			ss := strings.Split(raw, "\n")
@@ -165,7 +183,7 @@ func (jw *jobWatcher) watchStream(ctx context.Context, allocation *nomad.Allocat
 					continue
 				}
 
-				fmt.Printf("%s: %s\n", jw.job, s)
+				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], s)
 			}
 
 		case err := <-stdoutErrChan:
@@ -176,5 +194,4 @@ func (jw *jobWatcher) watchStream(ctx context.Context, allocation *nomad.Allocat
 			return nil
 		}
 	}
-
 }
