@@ -29,7 +29,7 @@ func run(args []string) error {
 	watchFlagSet := flag.NewFlagSet("nomadlogs", flag.ExitOnError)
 	var (
 		jobs = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
-		addr = watchFlagSet.String("addr", "http://127.0.0.1:4646", "nomad address")
+		addr = watchFlagSet.String("addr", nomad.DefaultConfig().Address, "nomad address")
 	)
 
 	if err := ff.Parse(watchFlagSet, args, ff.WithEnvVarPrefix("NOMAD_LOGS")); err != nil {
