@@ -36,6 +36,30 @@ func run(args []string) error {
 		return fmt.Errorf("could not parse flags: %s", err)
 	}
 
+	list := &ffcli.Command{
+		Name:       "list",
+		ShortUsage: "nomadlogs list",
+		ShortHelp:  "list jobs/allocations",
+		Exec: func(ctx context.Context, _ []string) error {
+			cfg := nomad.DefaultConfig()
+			cfg.Address = *addr
+			client, err := nomad.NewClient(cfg)
+			if err != nil {
+				return fmt.Errorf("could not create nomad client: %s", err)
+			}
+			list, _, err := client.Allocations().List(nil)
+			if err != nil {
+				return fmt.Errorf("could not get allocations: %s", err)
+			}
+			for _, allocation := range list {
+				for task := range allocation.TaskStates {
+					fmt.Printf("%s:%s\n", allocation.JobID, task)
+				}
+			}
+			return nil
+		},
+	}
+
 	watch := &ffcli.Command{
 		Name:       "watch",
 		ShortUsage: "nomadlogs watch [<arg> ...]",
@@ -83,7 +107,7 @@ func run(args []string) error {
 
 	root := &ffcli.Command{
 		ShortUsage:  "nomadlogs [flags] <subcommand>",
-		Subcommands: []*ffcli.Command{watch},
+		Subcommands: []*ffcli.Command{watch, list},
 	}
 
 	if err := root.ParseAndRun(context.Background(), os.Args[1:]); err != nil {
