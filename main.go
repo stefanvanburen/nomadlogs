@@ -39,8 +39,8 @@ func run(args []string) error {
 	list := &ffcli.Command{
 		Name:       "list",
 		ShortUsage: "nomadlogs list",
-		ShortHelp:  "list jobs/allocations",
-		Exec: func(ctx context.Context, _ []string) error {
+		ShortHelp:  "list jobs:allocations",
+		Exec: func(_ context.Context, _ []string) error {
 			cfg := nomad.DefaultConfig()
 			cfg.Address = *addr
 			client, err := nomad.NewClient(cfg)
