@@ -21,5 +21,5 @@ By default, nomadlogs will use the Nomad SDK's default configuration for Nomad a
 Also, if you're forwarding another instance of Nomad to another port, say `:4647`, you can run:
 
 ```sh
-nomadlogs watch -jobs job1:task1,job2:task1,job2:task2 -addr "http://localhost:4647"
+nomadlogs -addr "http://localhost:4647" watch -jobs job1:task1,job2:task1,job2:task2
 ```
