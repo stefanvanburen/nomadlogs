@@ -26,13 +26,15 @@ func main() {
 }
 
 func run(args []string) error {
-	watchFlagSet := flag.NewFlagSet("nomadlogs", flag.ExitOnError)
 	var (
-		jobs = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
-		addr = watchFlagSet.String("addr", nomad.DefaultConfig().Address, "nomad address")
+		rootFlagSet = flag.NewFlagSet("nomadlogs", flag.ExitOnError)
+		addr        = rootFlagSet.String("addr", nomad.DefaultConfig().Address, "nomad address")
+
+		watchFlagSet = flag.NewFlagSet("nomadlogs watch", flag.ExitOnError)
+		jobs         = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
 	)
 
-	if err := ff.Parse(watchFlagSet, args, ff.WithEnvVarPrefix("NOMAD_LOGS")); err != nil {
+	if err := ff.Parse(baseFlagSet, args, ff.WithEnvVarPrefix("NOMAD_LOGS")); err != nil {
 		return fmt.Errorf("could not parse flags: %s", err)
 	}
 
@@ -107,6 +109,7 @@ func run(args []string) error {
 
 	root := &ffcli.Command{
 		ShortUsage:  "nomadlogs [flags] <subcommand>",
+		FlagSet:     rootFlagSet,
 		Subcommands: []*ffcli.Command{watch, list},
 	}
 
