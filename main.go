@@ -36,7 +36,7 @@ func run(args []string) error {
 
 	list := &ffcli.Command{
 		Name:       "list",
-		ShortUsage: "nomadlogs list",
+		ShortUsage: "nomadlogs [flags] list",
 		ShortHelp:  "list jobs:allocations",
 		Exec: func(_ context.Context, _ []string) error {
 			cfg := nomad.DefaultConfig()
@@ -60,7 +60,7 @@ func run(args []string) error {
 
 	watch := &ffcli.Command{
 		Name:       "watch",
-		ShortUsage: "nomadlogs watch",
+		ShortUsage: "nomadlogs [flags] watch -jobs <job-a>:<allocation-a>",
 		ShortHelp:  "watch jobs:allocations",
 		FlagSet:    watchFlagSet,
 		Exec: func(_ context.Context, _ []string) error {
