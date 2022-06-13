@@ -11,7 +11,6 @@ import (
 
 	nomad "github.com/hashicorp/nomad/api"
 	okrun "github.com/oklog/run"
-	"github.com/peterbourgon/ff/v3"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -33,10 +32,6 @@ func run(args []string) error {
 		watchFlagSet = flag.NewFlagSet("nomadlogs watch", flag.ExitOnError)
 		jobs         = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
 	)
-
-	if err := ff.Parse(baseFlagSet, args, ff.WithEnvVarPrefix("NOMAD_LOGS")); err != nil {
-		return fmt.Errorf("could not parse flags: %s", err)
-	}
 
 	list := &ffcli.Command{
 		Name:       "list",
