@@ -108,7 +108,7 @@ func run(args []string) error {
 		Subcommands: []*ffcli.Command{watch, list},
 	}
 
-	if err := root.ParseAndRun(context.Background(), os.Args[1:]); err != nil {
+	if err := root.ParseAndRun(context.Background(), args); err != nil {
 		return err
 	}
 
