@@ -17,10 +17,11 @@ import (
 func main() {
 	// write meta logs to stderr, actual program output to stdout
 	log.SetOutput(os.Stderr)
-
 	log.SetPrefix("nomadlogs ")
+
 	if err := run(os.Args[1:]); err != nil {
-		log.Fatal(err)
+		fmt.Fprintf(os.Stderr, "error: %s\n", err)
+		os.Exit(1)
 	}
 }
 
