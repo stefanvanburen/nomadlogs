@@ -60,8 +60,8 @@ func run(args []string) error {
 
 	watch := &ffcli.Command{
 		Name:       "watch",
-		ShortUsage: "nomadlogs watch [<arg> ...]",
-		ShortHelp:  "watch the number of bytes in the arguments.",
+		ShortUsage: "nomadlogs watch",
+		ShortHelp:  "watch jobs:allocations",
 		FlagSet:    watchFlagSet,
 		Exec: func(_ context.Context, _ []string) error {
 			cfg := nomad.DefaultConfig()
