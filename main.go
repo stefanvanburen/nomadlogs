@@ -65,7 +65,7 @@ func run(args []string) error {
 		ShortUsage: "nomadlogs watch [<arg> ...]",
 		ShortHelp:  "watch the number of bytes in the arguments.",
 		FlagSet:    watchFlagSet,
-		Exec: func(ctx context.Context, _ []string) error {
+		Exec: func(_ context.Context, _ []string) error {
 			cfg := nomad.DefaultConfig()
 			cfg.Address = *addr
 
@@ -91,7 +91,7 @@ func run(args []string) error {
 						client: client,
 					}
 
-					return jw.run(ctx)
+					return jw.run()
 				}, func(err error) {
 
 				})
@@ -125,7 +125,7 @@ type jobWatcher struct {
 
 const waitDuration = 5 * time.Second
 
-func (jw *jobWatcher) run(ctx context.Context) error {
+func (jw *jobWatcher) run() error {
 	log.Printf("watching job %s, task %s\n", jw.job, jw.task)
 
 	for {
@@ -156,11 +156,11 @@ func (jw *jobWatcher) run(ctx context.Context) error {
 		}
 
 		// watch the stream until it's done
-		jw.watchStream(ctx, allocation)
+		jw.watchStream(allocation)
 	}
 }
 
-func (jw *jobWatcher) watchStream(ctx context.Context, allocation *nomad.Allocation) error {
+func (jw *jobWatcher) watchStream(allocation *nomad.Allocation) error {
 	stdoutFrames, stdoutErrChan := jw.client.AllocFS().Logs(allocation, true, jw.task, "stdout", "end", 0, nil, nil)
 	stderrFrames, stderrErrChan := jw.client.AllocFS().Logs(allocation, true, jw.task, "stderr", "end", 0, nil, nil)
 
