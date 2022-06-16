@@ -74,15 +74,14 @@ func run(args []string) error {
 
 			var g okrun.Group
 			for _, jobToTask := range strings.Split(*jobs, ",") {
-				jobToTask := jobToTask
+				s := strings.Split(jobToTask, ":")
+				if len(s) != 2 {
+					return fmt.Errorf("jobs must be specified in the format job:task")
+				}
+
+				job, task := s[0], s[1]
+
 				g.Add(func() error {
-					s := strings.Split(jobToTask, ":")
-					if len(s) != 2 {
-						return fmt.Errorf("jobs must be specified in the format job:task")
-					}
-
-					job, task := s[0], s[1]
-
 					jw := jobWatcher{
 						job:    job,
 						task:   task,
@@ -90,7 +89,7 @@ func run(args []string) error {
 					}
 
 					return jw.run()
-				}, func(err error) {
+				}, func(error) {
 
 				})
 			}
