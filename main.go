@@ -125,7 +125,7 @@ type jobWatcher struct {
 const waitDuration = 5 * time.Second
 
 func (jw *jobWatcher) run() error {
-	log.Printf("watching job %s, task %s\n", jw.job, jw.task)
+	log.Printf("watching job %s, task %s", jw.job, jw.task)
 
 	for range time.Tick(waitDuration) {
 		allocationList, _, err := jw.client.Allocations().List(nil)
