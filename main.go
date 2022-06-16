@@ -127,11 +127,10 @@ const waitDuration = 5 * time.Second
 func (jw *jobWatcher) run() error {
 	log.Printf("watching job %s, task %s\n", jw.job, jw.task)
 
-	for {
+	for range time.Tick(waitDuration) {
 		allocationList, _, err := jw.client.Allocations().List(nil)
 		if err != nil {
-			log.Printf("could not list nomad allocations. nomad probably isn't running? waiting %s before trying again: %s\n", waitDuration, err)
-			time.Sleep(waitDuration)
+			log.Printf("could not list nomad allocations. nomad probably isn't running? waiting %s before trying again: %s", waitDuration, err)
 			continue
 		}
 
@@ -144,19 +143,21 @@ func (jw *jobWatcher) run() error {
 		}
 
 		if allocationID == "" {
-			log.Printf("no allocations running for %s; waiting for %s before trying again\n", jw.job, waitDuration)
-			time.Sleep(waitDuration)
+			log.Printf("no allocations running for %s; waiting for %s before trying again", jw.job, waitDuration)
 			continue
 		}
 
 		allocation, _, err := jw.client.Allocations().Info(allocationID, nil)
 		if err != nil {
-			return fmt.Errorf("could not retrieve allocation: %s", err)
+			log.Printf("could not retrieve allocation; waiting for %s before trying again", waitDuration)
+			continue
 		}
 
 		// watch the stream until it's done
 		jw.watchStream(allocation)
 	}
+
+	return nil
 }
 
 func (jw *jobWatcher) watchStream(allocation *nomad.Allocation) error {
