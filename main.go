@@ -193,50 +193,28 @@ func (jw *jobWatcher) watchAllocationLogs(allocation *nomad.Allocation) error {
 				log.Printf("stdoutFrames closed!")
 				return nil
 			}
-			if stdoutFrame == nil {
-				log.Printf("got nil stdout frame, skipping")
-				continue
-			}
-
-			// We're probably getting multiple lines.
-			raw := string(stdoutFrame.Data)
-			ss := strings.Split(raw, "\n")
-
-			for _, s := range ss {
-				if s == "" {
+			for _, line := range strings.Split(string(stdoutFrame.Data), "\n") {
+				if line == "" {
 					continue
 				}
-
-				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], s)
+				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], line)
 			}
-
 		case stderrFrame, more := <-stderrFrames:
 			if !more {
 				log.Printf("stderrFrames closed!")
 				return nil
 			}
-			if stderrFrame == nil {
-				log.Printf("got nil stderr frame")
-				continue
-			}
-
-			// We're probably getting multiple lines.
-			raw := string(stderrFrame.Data)
-			ss := strings.Split(raw, "\n")
-
-			for _, s := range ss {
-				if s == "" {
+			for _, line := range strings.Split(string(stderrFrame.Data), "\n") {
+				if line == "" {
 					continue
 				}
-
-				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], s)
+				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], line)
 			}
-
 		case err := <-stdoutErrChan:
-			log.Printf("%s: got error (allocation probably shutting down): %s\n", jw.job, err)
+			log.Printf("%s: got error (allocation probably shutting down): %s", jw.job, err)
 			return nil
 		case err := <-stderrErrChan:
-			log.Printf("%s: got error (allocation probably shutting down): %s\n", jw.job, err)
+			log.Printf("%s: got error (allocation probably shutting down): %s", jw.job, err)
 			return nil
 		}
 	}
