@@ -7,6 +7,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	nomad "github.com/hashicorp/nomad/api"
@@ -86,6 +87,8 @@ func run(args []string) error {
 						job:    job,
 						task:   task,
 						client: client,
+
+						allocationsWatched: map[string]struct{}{},
 					}
 
 					return jw.run()
@@ -119,6 +122,9 @@ type jobWatcher struct {
 	job    string
 	task   string
 	client *nomad.Client
+
+	mu                 sync.Mutex
+	allocationsWatched map[string]struct{}
 }
 
 const waitDuration = 5 * time.Second
@@ -129,37 +135,54 @@ func (jw *jobWatcher) run() error {
 	for range time.Tick(waitDuration) {
 		allocationList, _, err := jw.client.Allocations().List(nil)
 		if err != nil {
-			log.Printf("could not list nomad allocations. nomad probably isn't running? waiting %s before trying again: %s", waitDuration, err)
+			log.Printf("could not list nomad allocations. waiting %s before trying again: %s", waitDuration, err)
 			continue
 		}
 
-		var allocationID string
+		allocationIDsForJob := []string{}
 		for _, allocationStub := range allocationList {
 			if allocationStub.JobID == jw.job && allocationStub.ClientStatus == "running" {
-				allocationID = allocationStub.ID
-				break
+				allocationIDsForJob = append(allocationIDsForJob, allocationStub.ID)
 			}
 		}
 
-		if allocationID == "" {
+		if len(allocationIDsForJob) == 0 {
 			log.Printf("no allocations running for %s; waiting for %s before trying again", jw.job, waitDuration)
 			continue
 		}
 
-		allocation, _, err := jw.client.Allocations().Info(allocationID, nil)
-		if err != nil {
-			log.Printf("could not retrieve allocation; waiting for %s before trying again", waitDuration)
-			continue
-		}
+		for _, allocationID := range allocationIDsForJob {
+			if _, alreadyWatching := jw.allocationsWatched[allocationID]; alreadyWatching {
+				continue
+			}
 
-		// watch the stream until it's done
-		jw.watchStream(allocation)
+			allocation, _, err := jw.client.Allocations().Info(allocationID, nil)
+			if err != nil {
+				// The allocation probably went away before we could query it
+				// specifically.
+				log.Printf("could not retrieve allocation %s", allocationID)
+				continue
+			}
+
+			go func(allocationID string) {
+				jw.mu.Lock()
+				jw.allocationsWatched[allocationID] = struct{}{}
+				jw.mu.Unlock()
+
+				// watch the stream until it's done
+				jw.watchAllocationLogs(allocation)
+
+				jw.mu.Lock()
+				delete(jw.allocationsWatched, allocationID)
+				jw.mu.Unlock()
+			}(allocationID)
+		}
 	}
 
 	return nil
 }
 
-func (jw *jobWatcher) watchStream(allocation *nomad.Allocation) error {
+func (jw *jobWatcher) watchAllocationLogs(allocation *nomad.Allocation) error {
 	stdoutFrames, stdoutErrChan := jw.client.AllocFS().Logs(allocation, true, jw.task, "stdout", "end", 0, nil, nil)
 	stderrFrames, stderrErrChan := jw.client.AllocFS().Logs(allocation, true, jw.task, "stderr", "end", 0, nil, nil)
 
