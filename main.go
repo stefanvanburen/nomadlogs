@@ -11,7 +11,6 @@ import (
 	"time"
 
 	nomad "github.com/hashicorp/nomad/api"
-	okrun "github.com/oklog/run"
 	"github.com/peterbourgon/ff/v3/ffcli"
 )
 
@@ -26,13 +25,18 @@ func main() {
 	}
 }
 
+type jobTask struct {
+	job  string
+	task string
+}
+
 func run(args []string) error {
 	var (
 		rootFlagSet = flag.NewFlagSet("nomadlogs", flag.ExitOnError)
 		addr        = rootFlagSet.String("addr", nomad.DefaultConfig().Address, "nomad address")
 
 		watchFlagSet = flag.NewFlagSet("nomadlogs watch", flag.ExitOnError)
-		jobs         = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
+		jobsToTasks  = watchFlagSet.String("jobs", "", "comma-separated list of job:task to watch")
 	)
 
 	list := &ffcli.Command{
@@ -73,35 +77,28 @@ func run(args []string) error {
 				return fmt.Errorf("could not create nomad client: %s", err)
 			}
 
-			var g okrun.Group
-			for _, jobToTask := range strings.Split(*jobs, ",") {
+			var jobTasks []jobTask
+			for _, jobToTask := range strings.Split(*jobsToTasks, ",") {
 				s := strings.Split(jobToTask, ":")
 				if len(s) != 2 {
 					return fmt.Errorf("jobs must be specified in the format job:task")
 				}
 
 				job, task := s[0], s[1]
-
-				g.Add(func() error {
-					jw := jobWatcher{
-						job:    job,
-						task:   task,
-						client: client,
-
-						allocationsWatched: map[string]struct{}{},
-					}
-
-					return jw.run()
-				}, func(error) {
-
+				jobTasks = append(jobTasks, jobTask{
+					job:  job,
+					task: task,
 				})
 			}
 
-			if err := g.Run(); err != nil {
-				return fmt.Errorf("got error: %s", err)
+			w := watcher{
+				jobTasks: jobTasks,
+				client:   client,
+
+				allocationsWatched: make(map[string]struct{}),
 			}
 
-			return nil
+			return w.run()
 		},
 	}
 
@@ -118,10 +115,9 @@ func run(args []string) error {
 	return nil
 }
 
-type jobWatcher struct {
-	job    string
-	task   string
-	client *nomad.Client
+type watcher struct {
+	jobTasks []jobTask
+	client   *nomad.Client
 
 	mu                 sync.Mutex
 	allocationsWatched map[string]struct{}
@@ -129,34 +125,33 @@ type jobWatcher struct {
 
 const waitDuration = 5 * time.Second
 
-func (jw *jobWatcher) run() error {
-	log.Printf("watching job %s, task %s", jw.job, jw.task)
+func (w *watcher) run() error {
+	for _, jobTask := range w.jobTasks {
+		log.Printf("watching job %s, task %s", jobTask.job, jobTask.task)
+	}
 
 	for range time.Tick(waitDuration) {
-		allocationList, _, err := jw.client.Allocations().List(nil)
+		allocationList, _, err := w.client.Allocations().List(nil)
 		if err != nil {
 			log.Printf("could not list nomad allocations. waiting %s before trying again: %s", waitDuration, err)
 			continue
 		}
 
-		allocationIDsForJob := []string{}
+		allocationsToWatch := []string{}
 		for _, allocationStub := range allocationList {
-			if allocationStub.JobID == jw.job && allocationStub.ClientStatus == "running" {
-				allocationIDsForJob = append(allocationIDsForJob, allocationStub.ID)
+			for _, jobTask := range w.jobTasks {
+				if allocationStub.JobID == jobTask.job && allocationStub.ClientStatus == "running" {
+					allocationsToWatch = append(allocationsToWatch, allocationStub.ID)
+				}
 			}
 		}
 
-		if len(allocationIDsForJob) == 0 {
-			log.Printf("no allocations running for %s; waiting for %s before trying again", jw.job, waitDuration)
-			continue
-		}
-
-		for _, allocationID := range allocationIDsForJob {
-			if _, alreadyWatching := jw.allocationsWatched[allocationID]; alreadyWatching {
+		for _, allocationID := range allocationsToWatch {
+			if _, alreadyWatching := w.allocationsWatched[allocationID]; alreadyWatching {
 				continue
 			}
 
-			allocation, _, err := jw.client.Allocations().Info(allocationID, nil)
+			allocation, _, err := w.client.Allocations().Info(allocationID, nil)
 			if err != nil {
 				// The allocation probably went away before we could query it
 				// specifically.
@@ -165,16 +160,23 @@ func (jw *jobWatcher) run() error {
 			}
 
 			go func(allocationID string) {
-				jw.mu.Lock()
-				jw.allocationsWatched[allocationID] = struct{}{}
-				jw.mu.Unlock()
+				w.mu.Lock()
+				w.allocationsWatched[allocationID] = struct{}{}
+				w.mu.Unlock()
 
-				// watch the stream until it's done
-				jw.watchAllocationLogs(allocation)
+				log.Printf("watching allocation %+v", allocation)
 
-				jw.mu.Lock()
-				delete(jw.allocationsWatched, allocationID)
-				jw.mu.Unlock()
+				aw := allocationWatcher{
+					allocation: allocation,
+					client:     w.client,
+				}
+
+				// watch the allocation until it's done
+				aw.watch()
+
+				w.mu.Lock()
+				delete(w.allocationsWatched, allocationID)
+				w.mu.Unlock()
 			}(allocationID)
 		}
 	}
@@ -182,40 +184,54 @@ func (jw *jobWatcher) run() error {
 	return nil
 }
 
-func (jw *jobWatcher) watchAllocationLogs(allocation *nomad.Allocation) error {
-	stdoutFrames, stdoutErrChan := jw.client.AllocFS().Logs(allocation, true, jw.task, "stdout", "end", 0, nil, nil)
-	stderrFrames, stderrErrChan := jw.client.AllocFS().Logs(allocation, true, jw.task, "stderr", "end", 0, nil, nil)
+type allocationWatcher struct {
+	allocation *nomad.Allocation
+	client     *nomad.Client
+	logPrefix  string
+}
+
+func newAllocationWatcher(allocation *nomad.Allocation, client *nomad.Client) allocationWatcher {
+	return allocationWatcher{
+		allocation: allocation,
+		client:     client,
+		logPrefix:  fmt.Sprintf("%s(%s)", allocation.JobID, allocation.ID[:6]),
+	}
+}
+
+func (aw *allocationWatcher) watch() {
+	stdoutFrames, stdoutErrChan := aw.client.AllocFS().Logs(aw.allocation, true, aw.allocation.TaskGroup, "stdout", "end", 0, nil, nil)
+	stderrFrames, stderrErrChan := aw.client.AllocFS().Logs(aw.allocation, true, aw.allocation.TaskGroup, "stderr", "end", 0, nil, nil)
 
 	for {
 		select {
 		case stdoutFrame, more := <-stdoutFrames:
 			if !more {
 				log.Printf("stdoutFrames closed!")
-				return nil
+				return
 			}
 			for _, line := range strings.Split(string(stdoutFrame.Data), "\n") {
 				if line == "" {
 					continue
 				}
-				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], line)
+				fmt.Printf("%s: %s\n", aw.logPrefix, line)
 			}
 		case stderrFrame, more := <-stderrFrames:
 			if !more {
 				log.Printf("stderrFrames closed!")
-				return nil
+				return
 			}
 			for _, line := range strings.Split(string(stderrFrame.Data), "\n") {
 				if line == "" {
 					continue
 				}
-				fmt.Printf("%s(%s): %s\n", jw.job, allocation.ID[:6], line)
+				fmt.Printf("%s: %s\n", aw.logPrefix, line)
 			}
 		case err := <-stdoutErrChan:
-			log.Printf("%s: got error (allocation probably shutting down): %s", jw.job, err)
-			return nil
+			log.Printf("%s: got error (allocation probably shutting down): %s", aw.logPrefix, err)
+			return
 		case err := <-stderrErrChan:
-			log.Printf("%s: got error (allocation probably shutting down): %s", jw.job, err)
-			return nil
+			log.Printf("%s: got error (allocation probably shutting down): %s", aw.logPrefix, err)
+			return
 		}
 	}
 }
